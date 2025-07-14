@@ -68,5 +68,5 @@ today=datetime.today().strftime("%Y-%m-%d")
 filename=f"104_rawdata_{today}.csv"
 folder=r"C:\Users\FM_pc\Desktop\jobs_analysis_project\data"
 os.makedirs(folder,exist_ok=True)  #確保資料夾存在，無則建立
-df.to_csv(os.path.join(folder,filename),index=False,encoding="utf-8-sig")
+df.to_csv(os.path.join(folder,filename),index=False,encoding="utf-8-sig",quoting=1)
 print(f"爬蟲完成，儲存成{filename}")
