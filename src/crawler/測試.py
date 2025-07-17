@@ -44,7 +44,6 @@ def is_relevant_job(title):
     return any(good in title for good in WHITELIST_KEYWORDS) and not any(bad in title for bad in EXCLUDE_WORDS)
 
 #---第二層爬蟲---所需參數與函數
-detail_url="https://www.104.com.tw/job/ajax/content/{jobNo}"
 detail_headers={
     "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
     "Referer":"", #先留空
@@ -61,13 +60,37 @@ def fetch_job_detail(first_layer_data):
         except Exception as e:
             print(f"解析連結資料錯誤: {e}")
             return None
-    detail_url=link_data["job"]
+    
+    job_url = link_data["job"]
+    job_no = job_url.strip("/").split("/")[-1]
+    detail_url = f"https://www.104.com.tw/job/ajax/content/{job_no}"
 
-    detail_headers_current=detail_headers.copy()
-    detail_headers_current["Referer"]=link_data["job"]
-    response=requests.get(url=detail_url,headers=detail_headers, timeout=15)
-    detail_data = response.json()
-    return detail_data 
+    detail_headers_current = detail_headers.copy()
+    detail_headers_current["Referer"] = link_data["job"]
+
+    try:
+        response = requests.get(url=detail_url, headers=detail_headers_current, timeout=15)
+        response.raise_for_status()  # 如果status不是200，會拋出HTTPError
+        detail_data = response.json()
+        print(f"Returned detail_data: {detail_data}")  # 打印返回的資料，看看它的結構
+
+        if isinstance(detail_data["data"], list):  # 檢查是否是列表
+            print("Returned 'data' is a list, processing first item...")
+            return detail_data["data"][0]  # 如果是列表，取第一個項目
+        elif isinstance(detail_data["data"], dict):  # 如果是字典
+            return detail_data["data"]
+        else:
+            print("Unexpected structure of 'data' field")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"請求錯誤: {e}")
+        print(f"回應內容: {response.text}")  # 打印出回應的原始文本
+        return None
+    except ValueError as e:
+        print(f"解析JSON錯誤: {e}")
+        print(f"回應內容: {response.text}")  # 打印出回應的原始文本
+        return None
+
 
 
 #開始請求回傳資料
@@ -79,14 +102,17 @@ while page <= max_page:
         params["page"]=page
         print(f"🔍 抓取「{keywords}」第 {page} 頁")
         response=requests.get(url=url,params=params,headers=headers)
+        print(response.text)
         data=response.json()
         filter_jobs=[job for job in data["data"] if is_relevant_job(job["jobName"])] 
         detail_data_all=[]
-        for item in filter_jobs:
-            detail_data =fetch_job_detail(item)
-            detail_data_all.append(detail_data)
-        merged_job_data = {**filter_jobs, **detail_data_all} 
-        all_data.append(merged_job_data)
+        for job_item in filter_jobs:
+            detail_info = fetch_job_detail(job_item) # 獲取單一職位的詳細資料
+            if detail_info:
+                merged_record = {**job_item, **detail_info} # 將兩個字典合併
+                all_data.append(merged_record) # 加入總列表
+            else:
+                all_data.append(job_item) # 若無詳細資料，則只加入第一層數據
         time.sleep(random.uniform(1.5,3.5)) #模擬人操作，隨機時間間隔換頁
         page+=1
     except Exception as e:
