@@ -17,6 +17,9 @@ SELECT
 	salaryLow AS 薪資下限,
 	d3 AS 工作時段,
 	jobCat as 職務分類代碼,
-	isActivelyHiring AS 是否積極徵才
-INTO [104_cleaned_2025-07-10]
-FROM [104_rawdata_2025-07-10];
+	isActivelyHiring AS 是否積極徵才,
+	condition AS 條件要求,
+	welfare AS 福利制度,
+	employees AS 員工人數
+INTO [104_cleaned_2025-07-17]
+FROM [104_rawdata_2025-07-17];

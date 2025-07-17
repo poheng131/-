@@ -4,6 +4,7 @@ import random
 import pandas as pd
 from datetime import datetime 
 import os  
+import ast
 
 #先F12開啟開發者模式，確認參數
 keywords="數據分析"
@@ -42,6 +43,33 @@ def is_relevant_job(title):
     title=title.lower()
     return any(good in title for good in WHITELIST_KEYWORDS) and not any(bad in title for bad in EXCLUDE_WORDS)
 
+#---第二層爬蟲---所需參數與函數
+detail_headers={
+    "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    "Referer":"", #先留空
+    "X-Requested-With": "XMLHttpRequest",
+}
+def fetch_job_detail(first_layer_data):
+    link_data = first_layer_data["link"]
+    print(f"Link data: {link_data}")  # 確認link_data的原始格式
+
+    # 如果 link_data 已經是字典格式，直接使用它；如果是字串，則解析它
+    if isinstance(link_data, str):
+        try:
+            link_data = ast.literal_eval(link_data)
+        except Exception as e:
+            print(f"解析連結資料錯誤: {e}")
+            return None
+    job_url = link_data["job"]
+    job_no = job_url.strip("/").split("/")[-1]
+    detail_url = f"https://www.104.com.tw/job/ajax/content/{job_no}"
+
+    detail_headers_current=detail_headers.copy()
+    detail_headers_current["Referer"]=link_data["job"]
+    response=requests.get(url=detail_url,headers=detail_headers_current, timeout=15)
+    detail_data = response.json()
+    return detail_data["data"]
+
 
 #開始請求回傳資料
 
@@ -54,7 +82,15 @@ while page <= max_page:
         response=requests.get(url=url,params=params,headers=headers)
         data=response.json()
         filter_jobs=[job for job in data["data"] if is_relevant_job(job["jobName"])] 
-        all_data.extend(filter_jobs)      
+        detail_data_all=[]
+        for item in filter_jobs:   #合併第一層與第二層資料
+            detail_data =fetch_job_detail(item)
+            if detail_data:
+                merge_record={**item,**detail_data}
+                all_data.append(merge_record)
+            else:
+                all_data.append(item)
+
         time.sleep(random.uniform(1.5,3.5)) #模擬人操作，隨機時間間隔換頁
         page+=1
     except Exception as e:
