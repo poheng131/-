@@ -44,7 +44,6 @@ def is_relevant_job(title):
     return any(good in title for good in WHITELIST_KEYWORDS) and not any(bad in title for bad in EXCLUDE_WORDS)
 
 #---第二層爬蟲---所需參數與函數
-detail_url="https://www.104.com.tw/job/ajax/content/{jobNo}"
 detail_headers={
     "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
     "Referer":"", #先留空
@@ -61,19 +60,21 @@ def fetch_job_detail(first_layer_data):
         except Exception as e:
             print(f"解析連結資料錯誤: {e}")
             return None
-    detail_url=link_data["job"]
+    job_url = link_data["job"]
+    job_no = job_url.strip("/").split("/")[-1]
+    detail_url = f"https://www.104.com.tw/job/ajax/content/{job_no}"
 
     detail_headers_current=detail_headers.copy()
     detail_headers_current["Referer"]=link_data["job"]
-    response=requests.get(url=detail_url,headers=detail_headers, timeout=15)
+    response=requests.get(url=detail_url,headers=detail_headers_current, timeout=15)
     detail_data = response.json()
-    return detail_data 
+    return detail_data["data"]
 
 
 #開始請求回傳資料
 
 all_data=[]  #將蒐集的資料存在這個空list當中
-max_page=10
+max_page=50
 while page <= max_page:
     try:
         params["page"]=page
@@ -82,11 +83,14 @@ while page <= max_page:
         data=response.json()
         filter_jobs=[job for job in data["data"] if is_relevant_job(job["jobName"])] 
         detail_data_all=[]
-        for item in filter_jobs:
+        for item in filter_jobs:   #合併第一層與第二層資料
             detail_data =fetch_job_detail(item)
-            detail_data_all.append(detail_data)
-        merged_job_data = {**filter_jobs, **detail_data_all} 
-        all_data.append(merged_job_data)
+            if detail_data:
+                merge_record={**item,**detail_data}
+                all_data.append(merge_record)
+            else:
+                all_data.append(item)
+
         time.sleep(random.uniform(1.5,3.5)) #模擬人操作，隨機時間間隔換頁
         page+=1
     except Exception as e:
