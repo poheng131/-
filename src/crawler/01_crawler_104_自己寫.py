@@ -7,17 +7,16 @@ import os
 import ast
 
 #先F12開啟開發者模式，確認參數
-keywords="數據分析"
-page=1
+keywords_list = ["數據分析", "數據工程", "數據科學"]
 
 url="https://www.104.com.tw/jobs/search/api/jobs"
 
 params={
     "jobsource":"m_joblist_search",
-    "keyword":keywords,
+    "keyword":"",    #先留空 之後動態改變
     "mode":"s",
     "order":15,
-    "page":page,
+    "page":"",
     "pagesize":20,
 }
 
@@ -29,12 +28,19 @@ headers={
 
 # ✅ 白名單：只保留這些職缺名稱關鍵字的職缺
 WHITELIST_KEYWORDS = [
-    "數據分析", "資料分析", "data analyst", "data analysis", 
-    "data analytic", "資料科學", "data scientist",
-    "資料工程", "data engineer", "商業分析", "bi", 
-    "bi工程師", "bi analyst", "powerbi", "business intelligence",
-    "business analyst", "machine learning", "AI分析"
+    # 中文職稱
+    "資料分析", "數據分析", "資料科學", "數據科學", 
+    "資料工程", "數據工程", "商業分析", "商業智慧", 
+    "統計分析", "資料科學家", "資料工程師", "商業分析師", 
+    "數據科學家", "數據工程師",
+
+    # 英文職稱
+    "data analyst", "data analytics", "data analysis", 
+    "data scientist", "data science", "data engineer", 
+    "business analyst", "business intelligence", 
+    "bi analyst", "bi developer"
 ]
+
 
 # ❌ 黑名單：排除這些明顯不相關的職缺
 EXCLUDE_WORDS = ["助理", "客服", "門市", "儲備幹部", "工讀", "講師", "作業員", "行政", "業務", "外包", "設計"]
@@ -72,31 +78,35 @@ def fetch_job_detail(first_layer_data):
 
 
 #開始請求回傳資料
-
 all_data=[]  #將蒐集的資料存在這個空list當中
-max_page=50
-while page <= max_page:
-    try:
-        params["page"]=page
-        print(f"🔍 抓取「{keywords}」第 {page} 頁")
-        response=requests.get(url=url,params=params,headers=headers)
-        data=response.json()
-        filter_jobs=[job for job in data["data"] if is_relevant_job(job["jobName"])] 
-        detail_data_all=[]
-        for item in filter_jobs:   #合併第一層與第二層資料
-            detail_data =fetch_job_detail(item)
-            if detail_data:
-                merge_record={**item,**detail_data}
-                all_data.append(merge_record)
-            else:
-                all_data.append(item)
+for keywords in keywords_list:
+    page=1
+    max_page=100
+    while page <= max_page:
+        try:
+            params["keyword"]=keywords
+            params["page"]=page
+            print(f"🔍 抓取「{keywords}」第 {page} 頁")
+            response=requests.get(url=url,params=params,headers=headers)
+            data=response.json()
+            filter_jobs=[job for job in data["data"] if is_relevant_job(job["jobName"])] 
+            detail_data_all=[]
+            for item in filter_jobs:   #合併第一層與第二層資料
+                detail_data =fetch_job_detail(item)
+                if detail_data:
+                    merge_record={**item,**detail_data}
+                    merge_record["search_keyword"] = keywords
+                    all_data.append(merge_record)
+                else:
+                    item["search_keyword"] = keywords
+                    all_data.append(item)
 
-        time.sleep(random.uniform(1.5,3.5)) #模擬人操作，隨機時間間隔換頁
-        page+=1
-    except Exception as e:
-        print(e)
-        print("錯誤，解析json失敗!!")
-        break
+            time.sleep(random.uniform(1.5,3.5)) #模擬人操作，隨機時間間隔換頁
+            page+=1
+        except Exception as e:
+            print(e)
+            print("錯誤，解析json失敗!!")
+            break
 
 #將回傳內容儲存成檔案
 df=pd.DataFrame(all_data)  

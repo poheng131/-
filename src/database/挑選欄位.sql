@@ -20,6 +20,7 @@ SELECT
 	isActivelyHiring AS 是否積極徵才,
 	condition AS 條件要求,
 	welfare AS 福利制度,
-	employees AS 員工人數
-INTO [104_cleaned_2025-07-17]
-FROM [104_rawdata_2025-07-17];
+	employees AS 員工人數,
+	search_keyword AS 搜尋關鍵字
+INTO [104_cleaned_2025-07-18]
+FROM [104_rawdata_2025-07-18];
